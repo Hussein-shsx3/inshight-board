@@ -25,6 +25,7 @@ export default function RootLayout({ children }) {
               style: {
                 background: "#363636",
                 color: "#fff",
+                marginTop: "80px", // Add top margin to push below header
               },
               success: {
                 duration: 3000,
