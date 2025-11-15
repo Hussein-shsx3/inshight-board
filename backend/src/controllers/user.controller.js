@@ -30,7 +30,24 @@ exports.addFavorite = async (req, res, next) => {
   try {
     const { articleId, title, url, source } = req.body;
 
+    // Validate required fields
+    if (!articleId || !title || !url) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing required fields: articleId, title, and url are required",
+      });
+    }
+
+    console.log("Adding favorite:", { articleId, title, url, source }); // Debug log
+
     const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
 
     // Check if already in favorites
     const exists = user.favorites.some((fav) => fav.articleId === articleId);
@@ -47,11 +64,13 @@ exports.addFavorite = async (req, res, next) => {
       articleId,
       title,
       url,
-      source,
+      source: source || "Unknown",
       savedAt: new Date(),
     });
 
     await user.save();
+
+    console.log("Favorite saved successfully"); // Debug log
 
     res.status(200).json({
       status: "success",
@@ -61,6 +80,7 @@ exports.addFavorite = async (req, res, next) => {
       },
     });
   } catch (error) {
+    console.error("Error adding favorite:", error); // Debug log
     next(error);
   }
 };
@@ -76,10 +96,25 @@ exports.removeFavorite = async (req, res, next) => {
 
     const user = await User.findById(req.user.id);
 
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
     // Filter out the article
+    const initialLength = user.favorites.length;
     user.favorites = user.favorites.filter(
       (fav) => fav.articleId !== articleId
     );
+
+    if (user.favorites.length === initialLength) {
+      return res.status(404).json({
+        status: "error",
+        message: "Article not found in favorites",
+      });
+    }
 
     await user.save();
 

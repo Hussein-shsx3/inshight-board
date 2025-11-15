@@ -20,6 +20,20 @@ const CATEGORIES = [
   { value: "sports", label: "Sports" },
 ];
 
+// Helper function to generate consistent articleId
+const generateArticleId = (article) => {
+  if (article.articleId) return article.articleId;
+
+  const str = `${article.title}-${article.publishedAt}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString();
+};
+
 export default function DashboardPage() {
   const { isAuthenticated } = useAuthStore();
   const { favorites, setFavorites } = useNewsStore();
@@ -80,35 +94,39 @@ export default function DashboardPage() {
       return;
     }
 
-    const isFavorited = favorites.some(
-      (fav) => fav.articleId === article.articleId
-    );
+    // Ensure article has articleId
+    const articleId = generateArticleId(article);
+    const isFavorited = favorites.some((fav) => fav.articleId === articleId);
 
     try {
       if (isFavorited) {
-        await userAPI.removeFavorite(article.articleId);
-        setFavorites(
-          favorites.filter((fav) => fav.articleId !== article.articleId)
-        );
+        await userAPI.removeFavorite(articleId);
+        setFavorites(favorites.filter((fav) => fav.articleId !== articleId));
         toast.success("Removed from favorites");
       } else {
         const favoriteData = {
-          articleId: article.articleId,
+          articleId: articleId,
           title: article.title,
           url: article.url,
           source: article.source?.name || "Unknown",
         };
-        await userAPI.addFavorite(favoriteData);
+
+        console.log("Saving favorite:", favoriteData); // Debug log
+
+        const response = await userAPI.addFavorite(favoriteData);
         setFavorites([...favorites, favoriteData]);
         toast.success("Added to favorites");
       }
     } catch (error) {
-      toast.error("Failed to update favorites");
       console.error("Favorite toggle error:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update favorites"
+      );
     }
   };
 
-  const isFavorited = (articleId) => {
+  const isFavorited = (article) => {
+    const articleId = generateArticleId(article);
     return favorites.some((fav) => fav.articleId === articleId);
   };
 
@@ -191,14 +209,22 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {newsData?.data?.articles?.map((article, index) => (
-                <NewsCard
-                  key={article.articleId || index}
-                  article={article}
-                  onFavoriteToggle={handleFavoriteToggle}
-                  isFavorited={isFavorited(article.articleId)}
-                />
-              ))}
+              {newsData?.data?.articles?.map((article, index) => {
+                // Ensure each article has an articleId
+                const articleWithId = {
+                  ...article,
+                  articleId: generateArticleId(article),
+                };
+
+                return (
+                  <NewsCard
+                    key={articleWithId.articleId}
+                    article={articleWithId}
+                    onFavoriteToggle={handleFavoriteToggle}
+                    isFavorited={isFavorited(articleWithId)}
+                  />
+                );
+              })}
             </div>
 
             {/* Results Info */}
